@@ -22,11 +22,18 @@ class PointsController {
         .distinct()
         .select('points.*');
 
+      const serializedPoints = points.map(point => {
+        return {
+          ...point,
+          image_url: `http://10.0.0.109:3333/uploads/${point.image}`
+        }
+      });
+
       return res.status(200).json({
         status: 'QUERY_OK',
         message: '',
         error: [],
-        data: points
+        data: serializedPoints
       });
     } catch (error) {
       return res.status(500).json({
@@ -47,6 +54,11 @@ class PointsController {
         .first();
 
       if (point) {
+        const serializedPoint = {
+            ...point,
+            image_url: `http://10.0.0.109:3333/uploads/${point.image}`
+          };
+
         const items = await connection('items')
           .join('point_items', 'items.id', '=', 'point_items.item')
           .where({ 'point_items.point': id })
@@ -56,7 +68,7 @@ class PointsController {
           status: 'QUERY_OK',
           message: '',
           error: [],
-          data: {...point, items}
+          data: {...serializedPoint, items}
         });
       }
       else
@@ -92,7 +104,7 @@ class PointsController {
       await connection.transaction(async trx => {
         const insertion = await trx('points').insert({
           name,
-          image: 'fake-image',
+          image: req.file.filename,
           email,
           whatsapp,
           latitude,
@@ -101,12 +113,15 @@ class PointsController {
           UF
         });
   
-        const pointItems = items.map((id: Number) => {
-          return {
-            item: id,
-            point: insertion
-          }
-        });
+        const pointItems = items
+          .split(',')
+          .map((item: string) => Number(item.trim()))
+          .map((id: Number) => {
+            return {
+              item: id,
+              point: insertion
+            }
+          });
   
         await trx('point_items').insert(pointItems);
   
